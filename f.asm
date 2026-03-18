@@ -30,22 +30,53 @@ endstruc
 
 		section .text
 _start:
-			mov eax, SYS_WRITE
-			mov ebx, 1
-			mov ecx, message
-			mov edx, (message.end - message)
-			int 0x80
+			push message,
+			call print
+			sub esp, 8
 
 			push 0
 			push stdin
 			call file_init
 			sub esp, 8
 
+			call main
+
 			mov eax, SYS_EXIT
 			mov ebx, 0
 			int 0x80
 
-; IN:  file*, descriptor
+main:
+			_prologue
+			_epilogue
+
+; IN: null terminated string
+; OUT: none
+; prints a null terminated string
+print:
+			_prologue
+			push ebx
+
+			mov eax, _ARG(0)
+			mov edx, 0
+.loop:
+			mov cl, [eax + edx]
+			cmp cl, 0
+			je .syscall
+
+			add edx, 1
+			jmp .loop
+			
+.syscall:
+			mov eax, SYS_WRITE
+			mov ebx, 1
+			mov ecx, _ARG(0)
+			int 0x80
+		
+			lea esp, _SLOT(1)
+			pop ebx
+			_epilogue
+
+; IN: file*, descriptor
 ; OUT: none
 ; Resets buffer and writes file descriptor
 file_init:
@@ -73,7 +104,7 @@ file_buffer_reset:
 ; IN:  file*
 ; OUT: bytes read or error (<0)
 ; Reads in as much as possible from a stream, deletes previous data
-file_buffer_read:
+file_refill_buffer:
 			_prologue
 			push ebx
 
@@ -89,13 +120,66 @@ file_buffer_read:
 
 			cmp eax, 0					; bytes read or negative
 			jl .ret
-
+.save:
+			lea edx, [eax + 1]
 			mov ebx, _ARG(0)
-			mov [ebx + file.end], eax
-.ret
-
+			mov [ebx + file.end], edx	; end is exclusive
+.ret:
 			lea esp, _SLOT(1)
 			pop ebx
+			_epilogue
+
+; IN: file*, buffer, capacity
+; OUT: bytes read or error
+file_read_line:
+			_prologue
+			push esi					; file
+			push edi					; count
+
+			mov esi, _ARG(0)
+			mov edi, 0
+.loop:
+			cmp edi, _ARG(2)			; count, capacity
+			jge .ret
+
+			; check if buffer empty
+			mov eax, [esi + file.start]
+			mov ecx, [esi + file.end]
+			cmp eax, ecx
+			jl .load
+
+.refill:
+			push _ARG(0)
+			call file_refill_buffer
+			cmp eax, 0
+			jge .load
+.bad:
+			mov edi, eax
+			jmp .ret
+
+.load:
+			; grab next char
+			lea edx, [esi + file.buf]
+			mov ecx, [esi + file.start]
+			mov al, [edx + ecx]
+			add ecx, 1
+			mov [esi + file.start], ecx
+
+			; save char
+			mov ecx, _ARG(1)
+			mov [ecx + edi], al
+			add edi, 1
+
+			; ret on newline
+			cmp al, 10
+			je .ret
+
+			jmp .loop
+.ret:
+			mov eax, edi
+			lea esp, _SLOT(2)
+			pop edi
+			pop esi
 			_epilogue
 
 
@@ -106,5 +190,5 @@ stdin: 		align 4
 
 		section .data
 
-message: 	db "Hello, World!", 10
+message: 	db "This is the epilogue", 10, 0
 .end:

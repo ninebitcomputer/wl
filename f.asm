@@ -3,7 +3,9 @@ global _start
 SYS_WRITE	equ 4 	; unsigned int fd 	const char *buf 	size_t count
 SYS_READ	equ 3	; unsigned int fd   char* buf 			size_t count
 SYS_EXIT	equ 1
+
 BUF_SIZE	equ 4096
+LB_SIZE		equ 1024
 
 struc file
 	.start:	resd 1
@@ -22,6 +24,12 @@ endstruc
 	ret
 %endmacro
 
+%macro _print 1
+	push %1
+	call print
+	sub esp, 4
+%endmacro
+
 %define _arg(n) ebp + 8 + 4*(n)
 %define _ARG(n) [_arg(n)]
 
@@ -30,9 +38,7 @@ endstruc
 
 		section .text
 _start:
-			push message,
-			call print
-			sub esp, 8
+			_print message
 
 			push 0
 			push stdin
@@ -47,6 +53,26 @@ _start:
 
 main:
 			_prologue
+
+.loop
+			_print s_prompt
+			push LB_SIZE - 1
+			push line_buf
+			push stdin
+			call file_read_line
+			sub esp, 12
+
+			cmp eax, 0
+			jge .process
+
+			_print s_error
+			jmp .ret
+.process:
+			mov [line_buf + eax], 0
+			_print line_buf
+			jmp .loop
+
+.ret:
 			_epilogue
 
 ; IN: null terminated string
@@ -188,7 +214,13 @@ file_read_line:
 stdin: 		align 4
 			resb file_size
 
+line_buf: 	resb LB_SIZE
+
 		section .data
 
 message: 	db "This is the epilogue", 10, 0
 .end:
+
+s_prompt:		db "> ", 10, 0
+s_error: 		db "an error occured", 10, 0
+s_rec:			db "received new line", 10, 0

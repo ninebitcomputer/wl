@@ -38,8 +38,6 @@ endstruc
 
 		section .text
 _start:
-			_print message
-
 			push 0
 			push stdin
 			call file_init
@@ -198,6 +196,7 @@ print:										;print()
 ; file_init(file*, desc)
 ; file_buffer_reset(file*)
 ; file_buffer_read(file*)
+; file_buffer_flush(file*)
 ; file_peakc(file*)
 ; file_getc(file*)
 ; file_read_line(file*)
@@ -276,9 +275,75 @@ file_buffer_flush:							;file_buffer_flush(file*)
 			push eax
 			@call1 file_buffer_reset, _ARG(0)
 			pop eax
-.ret
+.ret:
 			mov esp, _SLOT(1)
 			pop ebx
+			_epilogue
+
+; IN: file*, char
+; OUT: eax, 0 or error
+file_putc:									;file_putc(file*, char)
+			_prologue
+			mov eax, _ARG(0)
+
+			mov ecx, [eax + file.end]
+			cmp ecx, BUF_SIZE
+			jl .save						;if file.end is at end, flush
+
+			?call1 file_buffer_flush, eax, .ret
+.save:
+			mov eax, _ARG(0)
+			lea ecx, [eax + file.buf]
+			add ecx, [eax + file.end]
+			mov dl, _ARG(1)
+			mov [ecx], dl
+
+			inc [eax + file.end]
+
+			cmp [eax + file.end], BUF_SIZE
+			jge .flush
+
+			cmp dl, 10
+			je .flush
+
+			jmp .good
+.flush:
+			?call1 file_buffer_flush, eax, .ret
+.good:
+			mov eax, 0
+.ret:
+			_epilogue
+
+; IN: file*, buf, length
+; OUT: 0 on success, negative on error
+file_write:									;file_write(file*, buf, length)
+			_prologue
+			push edi
+			push esi
+
+			mov edi, _ARG(1)				;ptr
+			mov esi, 0						;idx
+.loop:
+			cmp esi, _ARG(2)
+			jge .good
+
+			movzx eax, byte [edi + esi]
+			push eax
+			push _ARG(0)
+			call file_putc
+
+			cmp eax, 0
+			jl .ret
+
+			inc esi
+			jmp .loop
+
+.good:
+			mov eax, 0
+.ret:
+			mov esp, _SLOT(2)
+			pop esi
+			pop edi
 			_epilogue
 
 ; IN: file*

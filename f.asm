@@ -54,7 +54,7 @@ _start:
 main:
 			_prologue
 
-.loop
+.loop:
 			_print s_prompt
 			push LB_SIZE - 1
 			push line_buf
@@ -155,6 +155,36 @@ file_refill_buffer:
 			pop ebx
 			_epilogue
 
+; IN: file*
+; OUT: eax
+file_getc:
+			_prologue
+
+			mov eax, _ARG(0)
+			mov ecx, [eax + file.start]
+			cmp ecx, [eax + file.end]
+
+			jl .readc
+
+			; refill buffer
+			push _ARG(0)
+			call file_refill_buffer
+			sub esp, 4
+
+			; error
+			cmp eax, 0
+			jl .ret
+
+.readc:
+			mov eax, _ARG(0)
+			mov ecx, [eax + file.start]
+			inc dword [eax + file.start]
+			lea edx, [eax + file.buf]
+
+			movzx eax, byte [edx + ecx] 
+.ret:
+			_epilogue
+
 ; IN: file*, buffer, capacity
 ; OUT: bytes read or error
 file_read_line:
@@ -187,9 +217,8 @@ file_read_line:
 			; grab next char
 			lea edx, [esi + file.buf]
 			mov ecx, [esi + file.start]
+			inc dword [esi + file.start]
 			mov al, [edx + ecx]
-			add ecx, 1
-			mov [esi + file.start], ecx
 
 			; save char
 			mov ecx, _ARG(1)

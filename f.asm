@@ -141,7 +141,7 @@ expect_number:								;expect_number
 			mov eax, -1
 
 .ret:
-			mov esp, _SLOT(2)
+			lea esp, _SLOT(2)
 			pop edi
 			pop esi
 			_epilogue
@@ -168,26 +168,23 @@ is_number:									;is_number(char)
 ; prints a null terminated string
 print:										;print()
 			_prologue
-			push ebx
 
 			mov eax, _ARG(0)
 			mov edx, 0
 .loop:
 			mov cl, [eax + edx]
 			cmp cl, 0
-			je .syscall
+			je .write
 
 			add edx, 1
 			jmp .loop
+
+.write:
+			push edx
+			push eax
+			push stdout
+			call file_write
 			
-.syscall:
-			mov eax, SYS_WRITE
-			mov ebx, 1
-			mov ecx, _ARG(0)
-			int 0x80
-		
-			lea esp, _SLOT(1)
-			pop ebx
 			_epilogue
 
 ; FILE IO
@@ -276,7 +273,7 @@ file_buffer_flush:							;file_buffer_flush(file*)
 			@call1 file_buffer_reset, _ARG(0)
 			pop eax
 .ret:
-			mov esp, _SLOT(1)
+			lea esp, _SLOT(1)
 			pop ebx
 			_epilogue
 
@@ -341,7 +338,7 @@ file_write:									;file_write(file*, buf, length)
 .good:
 			mov eax, 0
 .ret:
-			mov esp, _SLOT(2)
+			lea esp, _SLOT(2)
 			pop esi
 			pop edi
 			_epilogue

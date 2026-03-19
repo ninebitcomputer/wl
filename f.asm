@@ -24,34 +24,41 @@ endstruc
 	ret
 %endmacro
 
-%macro _print 1
-	push %1
-	call print
-	add esp, 4
-%endmacro
 
-%macro _call1 2							;_call1 function input
+%macro @call1 2							;@call1 function input
 	push %2
 	call %1
 	add esp, 4
 %endmacro
 
-%macro _call1 3							;_call1 function input save
-	push %2								;input gets popped into save
-	call %1								;do not save into return register
+%macro @call1 3							;@call1 function input recover
+	push %2								;arguments gets popped into recover
+	call %1								;do not recover into return register
 	pop %3
 %endmacro
 
-%macro _peak 2							;_peak stream error
-	_call1 file_peakc, %1				;peak into eax, or jump to error
+%macro ?call1 3							;?call1 jump if return <0
+	@call1 %1, %2
 	cmp eax, 0
-	jl %2
+	jl %3
 %endmacro
 
-%macro _peak 3							;_peak stream error save
-	_call1 file_peakc, %1, %3			;stream will be popped into save
-	cmp eax, 0							;do not save into return register
-	jl %2
+%macro ?call1 4							;?call1 jump if return <0 + recover
+	@call1 %1, %2, %4
+	cmp eax, 0
+	jl %3
+%endmacro
+
+%macro _peak 2							;_peak stream error
+	?call1 file_peakc, %1, %2
+%endmacro
+
+%macro _peak 3
+	?call1 file_peakc, %1, %2, %3		;_peak stream error recover
+%endmacro
+
+%macro _print 1
+	@call1 print, %1
 %endmacro
 
 %define _arg(n) ebp + 8 + 4*(n)
@@ -131,7 +138,7 @@ print:
 ; Resets buffer and writes file descriptor
 file_init:
 			_prologue
-			_call1 file_buffer_reset, _ARG(0), eax
+			@call1 file_buffer_reset, _ARG(0), eax
 			mov ecx, _ARG(1)			;fd
 
 			mov [eax + file.desc], ecx
@@ -155,7 +162,7 @@ file_refill_buffer:
 			_prologue
 			push ebx
 
-			_call1 file_buffer_reset, _ARG(0), eax
+			@call1 file_buffer_reset, _ARG(0), eax
 
 			mov edx, BUF_SIZE
 			lea ecx, [eax + file.buf]
@@ -184,10 +191,7 @@ file_peakc:
 
 			jl .readc
 
-			_call1 file_refill_buffer, _ARG(0)
-
-			cmp eax, 0						;error
-			jl .ret
+			?call1 file_refill_buffer, _ARG(0), .ret
 .readc:
 			mov eax, _ARG(0)
 			mov ecx, [eax + file.start]
@@ -218,9 +222,7 @@ file_read_line:
 			cmp edi, _ARG(2)			; count, capacity
 			jge .ret
 
-			_call1 file_getc, _ARG(0)
-			cmp eax, 0					; check errors
-			jl .ret
+			?call1 file_getc, _ARG(0), .ret
 
 			mov ecx, _ARG(1)			; save char
 			mov [ecx + edi], al

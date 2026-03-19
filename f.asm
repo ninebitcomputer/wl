@@ -1,11 +1,13 @@
+%include "macros.asm"
+
 global _start
 
 SYS_WRITE	equ 4 	; unsigned int fd 	const char *buf 	size_t count
 SYS_READ	equ 3	; unsigned int fd   char* buf 			size_t count
 SYS_EXIT	equ 1
 
-BUF_SIZE	equ 4096
-LB_SIZE		equ 1024
+BUF_SIZE	equ 128
+LB_SIZE		equ 64
 
 struc file
 	.start:	resd 1
@@ -14,40 +16,6 @@ struc file
 	.buf:	resb BUF_SIZE
 endstruc
 
-%macro _prologue 0
-	push ebp
-	mov ebp, esp
-%endmacro
-
-%macro _epilogue 0
-	leave
-	ret
-%endmacro
-
-
-%macro @call1 2							;@call1 function input
-	push %2
-	call %1
-	add esp, 4
-%endmacro
-
-%macro @call1 3							;@call1 function input recover
-	push %2								;arguments gets popped into recover
-	call %1								;do not recover into return register
-	pop %3
-%endmacro
-
-%macro ?call1 3							;?call1 jump if return <0
-	@call1 %1, %2
-	cmp eax, 0
-	jl %3
-%endmacro
-
-%macro ?call1 4							;?call1 jump if return <0 + recover
-	@call1 %1, %2, %4
-	cmp eax, 0
-	jl %3
-%endmacro
 
 %macro _peak 2							;_peak stream error
 	?call1 file_peakc, %1, %2
@@ -57,15 +25,16 @@ endstruc
 	?call1 file_peakc, %1, %2, %3		;_peak stream error recover
 %endmacro
 
+%macro _get 2
+	?call1 file_getc, %1, %2
+%endmacro
+
 %macro _print 1
 	@call1 print, %1
 %endmacro
 
-%define _arg(n) ebp + 8 + 4*(n)
-%define _ARG(n) [_arg(n)]
-
-%define _slot(n) ebp - 4*(n)
-%define _SLOT(n) [_slot(n)]
+; INTERPRETER/main
+; =============================================================================
 
 		section .text
 _start:
@@ -106,10 +75,92 @@ main:
 .ret:
 			_epilogue
 
+; DATA
+; =============================================================================
+
+		section .bss
+
+stdin: 		align 4
+			resb file_size
+
+line_buf: 	resb LB_SIZE
+
+		section .data
+
+message: 	db "This is the epilogue", 10, 0
+.end:
+
+s_prompt:		db "> ", 10, 0
+s_error: 		db "an error occured", 10, 0
+s_rec:			db "received new line", 10, 0
+
+; UTILITIES
+; =============================================================================
+; Functions:
+; expect_number()
+; is_number(char)
+
+; IN: None
+; OUT: eax = parsed number or negative on fail
+expect_number:								;expect_number
+			_prologue
+			push esi
+			push edi
+			mov esi, 0						;count
+			mov edi, 0						;total
+
+.loop:
+			_peak stdin, .bad
+			@call1 is_number, eax
+
+			test eax, eax
+			jz .save
+
+			_get stdin, .bad
+			sub eax, '0'
+
+			inc esi
+			imul edi, 10
+			add edi, eax
+
+			jmp .loop
+
+
+.save:
+			mov eax, edi
+			test esi, esi
+			; if no chars were parsed this isn't a number
+			jnz .ret
+.bad:
+			mov eax, -1
+
+.ret:
+			mov esp, _SLOT(2)
+			pop edi
+			pop esi
+			_epilogue
+
+; IN: char 
+; OUT: eax bool
+is_number:									;is_number(char)
+			_prologue
+			mov eax, 0
+			mov edx, _ARG(0)
+
+			cmp dl, '0'
+			jl .fail
+			cmp dl, '9'
+			jg .fail
+			jmp .ret
+.fail:
+			mov eax, 0
+.ret:
+			_epilogue
+
 ; IN: null terminated string
 ; OUT: none
 ; prints a null terminated string
-print:
+print:										;print()
 			_prologue
 			push ebx
 
@@ -133,10 +184,23 @@ print:
 			pop ebx
 			_epilogue
 
+; FILE IO
+; =============================================================================
+; Functions:
+; file_init(file*, desc)
+; file_buffer_reset(file*)
+; file_refill_buffer(file*)
+; file_peakc(file*)
+; file_getc(file*)
+; file_read_line(file*)
+
+		section .text
+
+
 ; IN: file*, descriptor
 ; OUT: none
 ; Resets buffer and writes file descriptor
-file_init:
+file_init:									;file_init(file*, descriptor)
 			_prologue
 			@call1 file_buffer_reset, _ARG(0), eax
 			mov ecx, _ARG(1)			;fd
@@ -157,8 +221,9 @@ file_buffer_reset:
 
 ; IN:  file*
 ; OUT: bytes read or error (<0)
-; Reads in as much as possible from a stream, deletes previous data
-file_refill_buffer:
+; Reads in as much as possible from a stream
+; deletes previous data
+file_refill_buffer:							;file_refill_buffer(file*)
 			_prologue
 			push ebx
 
@@ -170,7 +235,7 @@ file_refill_buffer:
 			mov eax, SYS_READ
 			int 0x80
 
-			cmp eax, 0					; bytes read or negative
+			cmp eax, 0						; bytes read or negative
 			jl .ret
 .save:
 			mov ebx, _ARG(0)
@@ -182,7 +247,7 @@ file_refill_buffer:
 
 ; IN: file*
 ; OUT: eax
-file_peakc:
+file_peakc:									;file_peakc(file*)
 			_prologue
 
 			mov eax, _ARG(0)
@@ -202,7 +267,7 @@ file_peakc:
 
 ; IN: file*
 ; OUT: eax
-file_getc:
+file_getc:									;file_getc(file*)
 			_prologue
 
 			_peak _ARG(0), .ret, ecx
@@ -213,22 +278,22 @@ file_getc:
 
 ; IN: file*, buffer, capacity
 ; OUT: bytes read or error
-file_read_line:
+file_read_line:								;file_read_line(file*, buffer, cap)
 			_prologue
-			push edi					; count
+			push edi						; count
 
 			mov edi, 0
 .loop:
-			cmp edi, _ARG(2)			; count, capacity
+			cmp edi, _ARG(2)				; count, capacity
 			jge .ret
 
 			?call1 file_getc, _ARG(0), .ret
 
-			mov ecx, _ARG(1)			; save char
+			mov ecx, _ARG(1)				; save char
 			mov [ecx + edi], al
 			inc edi
 
-			cmp al, 10					; ret on newline
+			cmp al, 10						; ret on newline
 			je .ret_edi
 			jmp .loop
 .ret_edi:
@@ -237,20 +302,3 @@ file_read_line:
 			lea esp, _SLOT(1)
 			pop edi
 			_epilogue
-
-
-		section .bss
-
-stdin: 		align 4
-			resb file_size
-
-line_buf: 	resb LB_SIZE
-
-		section .data
-
-message: 	db "This is the epilogue", 10, 0
-.end:
-
-s_prompt:		db "> ", 10, 0
-s_error: 		db "an error occured", 10, 0
-s_rec:			db "received new line", 10, 0

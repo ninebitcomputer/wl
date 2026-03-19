@@ -27,7 +27,7 @@ endstruc
 %macro _print 1
 	push %1
 	call print
-	sub esp, 4
+	add esp, 4
 %endmacro
 
 %define _arg(n) ebp + 8 + 4*(n)
@@ -43,7 +43,7 @@ _start:
 			push 0
 			push stdin
 			call file_init
-			sub esp, 8
+			add esp, 8
 
 			call main
 
@@ -60,7 +60,7 @@ main:
 			push line_buf
 			push stdin
 			call file_read_line
-			sub esp, 12
+			add esp, 12
 
 			cmp eax, 0
 			jge .process
@@ -147,9 +147,8 @@ file_refill_buffer:
 			cmp eax, 0					; bytes read or negative
 			jl .ret
 .save:
-			lea edx, [eax + 1]
 			mov ebx, _ARG(0)
-			mov [ebx + file.end], edx	; end is exclusive
+			mov [ebx + file.end], eax
 .ret:
 			lea esp, _SLOT(1)
 			pop ebx
@@ -169,7 +168,7 @@ file_getc:
 			; refill buffer
 			push _ARG(0)
 			call file_refill_buffer
-			sub esp, 4
+			add esp, 4
 
 			; error
 			cmp eax, 0
@@ -189,52 +188,32 @@ file_getc:
 ; OUT: bytes read or error
 file_read_line:
 			_prologue
-			push esi					; file
 			push edi					; count
 
-			mov esi, _ARG(0)
 			mov edi, 0
 .loop:
 			cmp edi, _ARG(2)			; count, capacity
 			jge .ret
 
-			; check if buffer empty
-			mov eax, [esi + file.start]
-			mov ecx, [esi + file.end]
-			cmp eax, ecx
-			jl .load
+			push _ARG(0)				; file
+			call file_getc
+			add esp, 4
 
-.refill:
-			push _ARG(0)
-			call file_refill_buffer
-			cmp eax, 0
-			jge .load
-.bad:
-			mov edi, eax
-			jmp .ret
+			cmp eax, 0					; check errors
+			jl .ret
 
-.load:
-			; grab next char
-			lea edx, [esi + file.buf]
-			mov ecx, [esi + file.start]
-			inc dword [esi + file.start]
-			mov al, [edx + ecx]
-
-			; save char
-			mov ecx, _ARG(1)
+			mov ecx, _ARG(1)			; save char
 			mov [ecx + edi], al
-			add edi, 1
+			inc edi
 
-			; ret on newline
-			cmp al, 10
-			je .ret
-
+			cmp al, 10					; ret on newline
+			je .ret_edi
 			jmp .loop
-.ret:
+.ret_edi:
 			mov eax, edi
-			lea esp, _SLOT(2)
+.ret:
+			lea esp, _SLOT(1)
 			pop edi
-			pop esi
 			_epilogue
 
 

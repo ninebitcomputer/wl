@@ -45,6 +45,11 @@ _start:
 			call file_init
 			add esp, 8
 
+			push 1
+			push stdout
+			call file_init
+			add esp, 8
+
 			call main
 
 			mov eax, SYS_EXIT
@@ -81,6 +86,9 @@ main:
 		section .bss
 
 stdin: 		align 4
+			resb file_size
+
+stdout:		align 4
 			resb file_size
 
 line_buf: 	resb LB_SIZE
@@ -242,6 +250,34 @@ file_buffer_read:							;file_buffer_read(file*)
 			mov [ebx + file.end], eax
 .ret:
 			lea esp, _SLOT(1)
+			pop ebx
+			_epilogue
+
+; IN: file*
+; OUT: bytes written or error (<0)
+; write out the contents of a file's buffer
+file_buffer_flush:							;file_buffer_flush(file*)
+			_prologue
+			push ebx
+
+			mov eax, _ARG(0)
+			mov ebx, [eax + file.desc]		;fd
+
+			mov ecx, [eax + file.start]
+			mov edx, [eax + file.end]
+			sub edx, ecx					;count
+
+			lea ecx, [eax + file.buf]
+			add ecx, [eax + file.start]		;buf
+
+			mov eax, SYS_WRITE
+			int 0x80
+
+			push eax
+			@call1 file_buffer_reset, _ARG(0)
+			pop eax
+.ret
+			mov esp, _SLOT(1)
 			pop ebx
 			_epilogue
 

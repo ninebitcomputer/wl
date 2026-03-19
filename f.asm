@@ -93,15 +93,13 @@ line_buf: 	resb LB_SIZE
 
 		section .data
 
-message: 	db "This is the epilogue", 10, 0
-.end:
-
-s_prompt:		db "> ", 10, 0
+s_prompt:		db "> ", 0
 s_error: 		db "an error occured", 10, 0
 s_rec:			db "received new line", 10, 0
 
 ; UTILITIES
 ; =============================================================================
+		section .text
 ; Functions:
 ; expect_number()
 ; is_number(char)

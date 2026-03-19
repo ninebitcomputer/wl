@@ -30,6 +30,35 @@ endstruc
 	add esp, 4
 %endmacro
 
+; _call1 function input
+%macro _call1 2
+	push %2
+	call %1
+	add esp, 4
+%endmacro
+
+%macro _call1 3
+	push %2
+	call %1
+	pop %3
+%endmacro
+
+; _peak stream error
+%macro _peak 2
+	_call1 file_peakc, %1
+	cmp eax, 0
+	jl %2
+%endmacro
+
+; _peak stream error save
+; stream will be popped into save
+; if stream is eax the cmp will misbehave
+%macro _peak 3
+	_call1 file_peakc, %1, %3
+	cmp eax, 0
+	jl %2
+%endmacro
+
 %define _arg(n) ebp + 8 + 4*(n)
 %define _ARG(n) [_arg(n)]
 
@@ -165,9 +194,7 @@ file_peakc:
 
 			jl .readc
 
-			push _ARG(0)					;refill buffer
-			call file_refill_buffer
-			add esp, 4
+			_call1 file_refill_buffer, _ARG(0)
 
 			cmp eax, 0						;error
 			jl .ret

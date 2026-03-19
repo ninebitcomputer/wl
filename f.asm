@@ -189,7 +189,7 @@ print:										;print()
 ; Functions:
 ; file_init(file*, desc)
 ; file_buffer_reset(file*)
-; file_refill_buffer(file*)
+; file_buffer_read(file*)
 ; file_peakc(file*)
 ; file_getc(file*)
 ; file_read_line(file*)
@@ -223,7 +223,7 @@ file_buffer_reset:
 ; OUT: bytes read or error (<0)
 ; Reads in as much as possible from a stream
 ; deletes previous data
-file_refill_buffer:							;file_refill_buffer(file*)
+file_buffer_read:							;file_buffer_read(file*)
 			_prologue
 			push ebx
 
@@ -256,7 +256,7 @@ file_peakc:									;file_peakc(file*)
 
 			jl .readc
 
-			?call1 file_refill_buffer, _ARG(0), .ret
+			?call1 file_buffer_read, _ARG(0), .ret
 .readc:
 			mov eax, _ARG(0)
 			mov ecx, [eax + file.start]
@@ -302,3 +302,4 @@ file_read_line:								;file_read_line(file*, buffer, cap)
 			lea esp, _SLOT(1)
 			pop edi
 			_epilogue
+

@@ -30,32 +30,27 @@ endstruc
 	add esp, 4
 %endmacro
 
-; _call1 function input
-%macro _call1 2
+%macro _call1 2							;_call1 function input
 	push %2
 	call %1
 	add esp, 4
 %endmacro
 
-%macro _call1 3
-	push %2
-	call %1
+%macro _call1 3							;_call1 function input save
+	push %2								;input gets popped into save
+	call %1								;do not save into return register
 	pop %3
 %endmacro
 
-; _peak stream error
-%macro _peak 2
-	_call1 file_peakc, %1
+%macro _peak 2							;_peak stream error
+	_call1 file_peakc, %1				;peak into eax, or jump to error
 	cmp eax, 0
 	jl %2
 %endmacro
 
-; _peak stream error save
-; stream will be popped into save
-; if stream is eax the cmp will misbehave
-%macro _peak 3
-	_call1 file_peakc, %1, %3
-	cmp eax, 0
+%macro _peak 3							;_peak stream error save
+	_call1 file_peakc, %1, %3			;stream will be popped into save
+	cmp eax, 0							;do not save into return register
 	jl %2
 %endmacro
 
@@ -136,10 +131,7 @@ print:
 ; Resets buffer and writes file descriptor
 file_init:
 			_prologue
-			push _ARG(0)
-			call file_buffer_reset
-
-			mov eax, _ARG(0)			;file
+			_call1 file_buffer_reset, _ARG(0), eax
 			mov ecx, _ARG(1)			;fd
 
 			mov [eax + file.desc], ecx
@@ -163,10 +155,8 @@ file_refill_buffer:
 			_prologue
 			push ebx
 
-			push _ARG(0)
-			call file_buffer_reset
+			_call1 file_buffer_reset, _ARG(0), eax
 
-			pop eax						;file
 			mov edx, BUF_SIZE
 			lea ecx, [eax + file.buf]
 			mov ebx, [eax + file.desc]
@@ -210,13 +200,8 @@ file_peakc:
 ; OUT: eax
 file_getc:
 			_prologue
-			push _ARG(0)
-			call file_peakc
-			pop ecx
 
-			cmp eax, 0
-			jl .ret
-
+			_peak _ARG(0), .ret, ecx
 			inc dword [ecx + file.start]
 			
 .ret:
@@ -233,10 +218,7 @@ file_read_line:
 			cmp edi, _ARG(2)			; count, capacity
 			jge .ret
 
-			push _ARG(0)				; file
-			call file_getc
-			add esp, 4
-
+			_call1 file_getc, _ARG(0)
 			cmp eax, 0					; check errors
 			jl .ret
 

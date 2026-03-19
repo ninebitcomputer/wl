@@ -9,6 +9,8 @@ SYS_EXIT	equ 1
 BUF_SIZE	equ 128
 LB_SIZE		equ 64
 
+CELL_COUNT	equ 512
+
 struc file
 	.start:	resd 1
 	.end:	resd 1
@@ -16,6 +18,23 @@ struc file
 	.buf:	resb BUF_SIZE
 endstruc
 
+%macro ?range 4							;_range val low behavior
+	push %3
+	push %2
+	push %1
+	call range
+	add esp, 12
+	test eax, eax
+	%4
+%endmacro
+
+%macro ?number 2
+	?range %1, '0', '9', %2
+%endmacro
+
+%macro ?lowercase 2
+	_range %1, 'a', 'z', %2
+%endmacro
 
 %macro _peak 2							;_peak stream error
 	?call1 file_peakc, %1, %2
@@ -84,7 +103,7 @@ main:
 		section .text
 ; Functions:
 ; expect_number()
-; is_number(char)
+; range(value, lower, upper)
 
 ; IN: None
 ; OUT: eax = parsed number or negative on fail
@@ -97,10 +116,7 @@ expect_number:								;expect_number
 
 .loop:
 			_peak stdin, .bad
-			@call1 is_number, eax
-
-			test eax, eax
-			jz .save
+			?number eax, jz .save
 
 			_get stdin, .bad
 			sub eax, '0'
@@ -126,11 +142,30 @@ expect_number:								;expect_number
 			pop esi
 			_epilogue
 
+; IN: val, low, high
+; OUT: bool
+range:										;range(val, low, high)
+			_prologue
+			mov eax, 1
+			mov edx, _ARG(0)
+
+			cmp dl, _ARG(1)
+			jl .fail
+
+			cmp dl, _ARG(2)
+			jg .fail
+
+			jmp .ret
+.fail:
+			mov eax, 0
+.ret:
+			_epilogue
+
 ; IN: char 
 ; OUT: eax bool
 is_number:									;is_number(char)
 			_prologue
-			mov eax, 0
+			mov eax, 1
 			mov edx, _ARG(0)
 
 			cmp dl, '0'
@@ -293,6 +328,7 @@ file_putc:									;file_putc(file*, char)
 
 ; IN: file*, buf, length
 ; OUT: 0 on success, negative on error
+; //TODO this could just be a syscall
 file_write:									;file_write(file*, buf, length)
 			_prologue
 			push edi
@@ -384,6 +420,7 @@ file_read_line:								;file_read_line(file*, buffer, cap)
 ; DATA
 ; =============================================================================
 
+; BSS
 		section .bss
 
 stdin: 		align 4
@@ -392,8 +429,12 @@ stdin: 		align 4
 stdout:		align 4
 			resb file_size
 
+cells:		align 4
+			resb 4*CELL_COUNT
+
 line_buf: 	resb LB_SIZE
 
+; DATA
 		section .data
 
 s_prompt:		db "> ", 0

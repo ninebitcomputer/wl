@@ -78,24 +78,6 @@ main:
 .ret:
 			_epilogue
 
-; DATA
-; =============================================================================
-
-		section .bss
-
-stdin: 		align 4
-			resb file_size
-
-stdout:		align 4
-			resb file_size
-
-line_buf: 	resb LB_SIZE
-
-		section .data
-
-s_prompt:		db "> ", 0
-s_error: 		db "an error occured", 10, 0
-s_rec:			db "received new line", 10, 0
 
 ; UTILITIES
 ; =============================================================================
@@ -399,3 +381,21 @@ file_read_line:								;file_read_line(file*, buffer, cap)
 			pop edi
 			_epilogue
 
+; DATA
+; =============================================================================
+
+		section .bss
+
+stdin: 		align 4
+			resb file_size
+
+stdout:		align 4
+			resb file_size
+
+line_buf: 	resb LB_SIZE
+
+		section .data
+
+s_prompt:		db "> ", 0
+s_error: 		db "an error occured", 10, 0
+s_rec:			db "received new line", 10, 0

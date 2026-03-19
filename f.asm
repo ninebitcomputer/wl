@@ -156,7 +156,7 @@ file_refill_buffer:
 
 ; IN: file*
 ; OUT: eax
-file_getc:
+file_peakc:
 			_prologue
 
 			mov eax, _ARG(0)
@@ -165,22 +165,33 @@ file_getc:
 
 			jl .readc
 
-			; refill buffer
-			push _ARG(0)
+			push _ARG(0)					;refill buffer
 			call file_refill_buffer
 			add esp, 4
 
-			; error
-			cmp eax, 0
+			cmp eax, 0						;error
 			jl .ret
-
 .readc:
 			mov eax, _ARG(0)
 			mov ecx, [eax + file.start]
-			inc dword [eax + file.start]
 			lea edx, [eax + file.buf]
-
 			movzx eax, byte [edx + ecx] 
+.ret:
+			_epilogue
+
+; IN: file*
+; OUT: eax
+file_getc:
+			_prologue
+			push _ARG(0)
+			call file_peakc
+			pop ecx
+
+			cmp eax, 0
+			jl .ret
+
+			inc dword [ecx + file.start]
+			
 .ret:
 			_epilogue
 

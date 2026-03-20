@@ -44,7 +44,7 @@ endstruc
 	?call1 file_peakc, %1, %2, %3		;_peak stream error recover
 %endmacro
 
-%macro _get 2
+%macro _get 2							;_get stream error
 	?call1 file_getc, %1, %2
 %endmacro
 
@@ -75,6 +75,7 @@ _start:
 
 main:
 			_prologue
+			mov [p_cell], 0
 
 .loop:
 			_print s_prompt
@@ -161,22 +162,48 @@ range:										;range(val, low, high)
 .ret:
 			_epilogue
 
-; IN: char 
-; OUT: eax bool
-is_number:									;is_number(char)
-			_prologue
-			mov eax, 1
-			mov edx, _ARG(0)
 
-			cmp dl, '0'
-			jl .fail
-			cmp dl, '9'
-			jg .fail
-			jmp .ret
-.fail:
+; IN: val
+; OUT: bool
+is_whitespace:								;is_whitespace(val)
+			_prologue
+			mov ecx, _ARG(0)
+			mov eax, 1
+
+			cmp ecx, ' '
+			je .ret
+			cmp ecx, '\t'
+			je .ret
+			cmp ecx, '\n'
+			je .ret
+			cmp ecx, '\v'
+			je .ret
+			cmp ecx, '\f'
+			je .ret
+			cmp ecx, '\r'
+			je .ret
+
 			mov eax, 0
 .ret:
 			_epilogue
+
+; IN: stream
+; OUT: eax = negative on error
+consume_whitespace:							;consume_whitespace(stream)
+			_prologue
+			_peak _ARG(0), .ret
+.loop:
+			@call1 is_whitespace, eax
+			test eax, eax
+			jz .good
+
+			_get _ARG(0), .ret
+			jmp .loop
+.good:
+			mov eax, 0
+.ret:
+			_epilogue
+
 
 ; IN: null terminated string
 ; OUT: none
@@ -429,6 +456,9 @@ stdin: 		align 4
 stdout:		align 4
 			resb file_size
 
+p_cell:		align 4
+			resd 1
+
 cells:		align 4
 			resb 4*CELL_COUNT
 
@@ -440,3 +470,5 @@ line_buf: 	resb LB_SIZE
 s_prompt:		db "> ", 0
 s_error: 		db "an error occured", 10, 0
 s_rec:			db "received new line", 10, 0
+s_overflow		db "stack overflow", 10, 0
+s_underflow		db "stack underflow", 10, 0

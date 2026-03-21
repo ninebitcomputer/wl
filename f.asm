@@ -124,6 +124,8 @@ main:
 ; is_whitespace(val)
 ; consume_whitespace(stream)
 ; print(s)
+; push_cell(val)
+; pop_cell()
 
 ; IN: None
 ; OUT: eax = parsed number or negative on fail
@@ -267,7 +269,7 @@ print:										;print()
 
 ; IN: value to push
 ; OUT: eax = negative on overflow
-push_cell:
+push_cell:									;push_cell(val)
 			_prologue
 			mov edx, [p_cell]
 			inc edx
@@ -287,7 +289,7 @@ push_cell:
 
 ; IN: none
 ; OUT: eax = negative on overflow, edx = value on success
-pop_cell:
+pop_cell:									;pop_cell()
 			_prologue
 			mov ecx, [p_cell]
 			dec ecx

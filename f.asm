@@ -52,6 +52,15 @@ endstruc
 	@call1 print, %1
 %endmacro
 
+%macro _putc 3							;_putc stream, char, error
+	push %2
+	push %1
+	call file_putc
+	add esp, 8
+	cmp eax, eax
+	jl %3
+%endmacro
+
 ; INTERPRETER/main
 ; =============================================================================
 
@@ -533,23 +542,61 @@ file_read_line:								;file_read_line(file*, buffer, cap)
 
 ; IN: file*, number
 ; OUT: eax = error on negative
-print_num:									; print_num(file*, number)
+file_write_num:								; file_write_num (file*, number)
 			_prologue
 			push esi						; count
 			push edi						; remaining
+
 			mov esi, 0
 			mov edi, _ARG(1)
 
+			test edi, edi
+			jz .zero
+
 			add esp, 32
-			mov byte [esp], 0
-.loop
+.loop:
+			cmp edi, 0
+			je .print
+
+			cmp esi, 32
+			jge .error
+
+			inc esi
+
+			mov edx, 0
+			mov eax, edi
+			mov ecx, 10
+			div ecx							; eax := q, edx ;= r
+
+			mov edi, eax
+			add edx, '0'
+
+			mov eax, esp
+			sub eax, esi
+			mov [eax], dl
+			jmp .loop
 			
-.zero
-			_pu
-.good
+.zero:
+			_putc _ARG(0), '0', .error
+
 			mov eax, 0
 			jmp .ret
-.error
+			; x
+
+.print:
+			mov eax, esp
+			sub eax, esi
+
+			push esi						; count
+			push eax						; buffer
+			push _ARG(0)					; file
+			call file_write
+			cmp eax, 0
+			jl .error
+
+			jmp .ret
+			; x
+.error:
 			mov eax, -1
 .ret
 			mov esp, _SLOT(2)

@@ -9,7 +9,7 @@ SYS_EXIT	equ 1
 BUF_SIZE	equ 128
 LB_SIZE		equ 64
 
-CELL_COUNT	equ 512
+CELL_COUNT	equ 2
 
 struc file
 	.start:	resd 1
@@ -91,16 +91,20 @@ main:
 
 .stack_overflow:
 			_print s_overflow
-			jmp .reloop
+			jmp .error
+
+.stack_underflow:
+			_print s_underflow
+			jmp .error
 
 			;TODO
 .number:
 			call expect_number
 			cmp eax, 0
-			jl .bad_token				; shouldn't happen
+			jl .error				; shouldn't happen
+			?call1 push_cell, eax, .stack_overflow
+
 			jmp .reloop
-
-
 			;TODO
 .operator:
 			?call1 consume_non_whitespace, stdin, .error
@@ -243,13 +247,23 @@ consume_non_whitespace:						;consume_non_whitespace(stream)
 			_epilogue
 
 
-; IN: null terminated string
-; OUT: none
+; IN: cstring
+; OUT: eax = wrote or negative on error
 ; prints a null terminated string
-print:										;print()
+print:										;print(cstring)
 			_prologue
 
-			mov eax, _ARG(0)
+			push _ARG(0)
+			push stdout
+			call fprint
+			
+			_epilogue
+
+; IN: file*, cstring
+; OUT: eax = wrote or negative on error
+fprint:										;fprint(file*, cstring)
+			_prologue
+			mov eax, _ARG(1)
 			mov edx, 0
 .loop:
 			mov cl, [eax + edx]
@@ -262,9 +276,8 @@ print:										;print()
 .write:
 			push edx
 			push eax
-			push stdout
+			push _ARG(0)
 			call file_write
-			
 			_epilogue
 
 ; IN: value to push
@@ -272,13 +285,11 @@ print:										;print()
 push_cell:									;push_cell(val)
 			_prologue
 			mov edx, [p_cell]
-			inc edx
-
 			cmp edx, CELL_COUNT
 			jge .bad
 
-			mov [p_cell], edx
-			mov [cells + edx], eax
+			mov [cells + edx * 4], eax
+			inc [p_cell]
 			mov eax, 0
 			jmp .ret
 
@@ -291,17 +302,17 @@ push_cell:									;push_cell(val)
 ; OUT: eax = negative on overflow, edx = value on success
 pop_cell:									;pop_cell()
 			_prologue
+			dec [p_cell]
 			mov ecx, [p_cell]
-			dec ecx
 			cmp ecx, 0
-			jl .bad
+			jl .underflow
 
-			mov [p_cell], ecx
-			mov edx, [cells + ecx + 4]
+			mov edx, [cells + ecx*4]
 			mov eax, 0
 			jmp .ret
-.bad:
+.underflow:
 			mov eax, -1
+			mov [p_cell], 0
 .ret:
 			_epilogue
 
@@ -518,6 +529,32 @@ file_read_line:								;file_read_line(file*, buffer, cap)
 .ret:
 			lea esp, _SLOT(1)
 			pop edi
+			_epilogue
+
+; IN: file*, number
+; OUT: eax = error on negative
+print_num:									; print_num(file*, number)
+			_prologue
+			push esi						; count
+			push edi						; remaining
+			mov esi, 0
+			mov edi, _ARG(1)
+
+			add esp, 32
+			mov byte [esp], 0
+.loop
+			
+.zero
+			_pu
+.good
+			mov eax, 0
+			jmp .ret
+.error
+			mov eax, -1
+.ret
+			mov esp, _SLOT(2)
+			pop edi
+			pop esi
 			_epilogue
 
 ; DATA

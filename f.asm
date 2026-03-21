@@ -33,7 +33,7 @@ endstruc
 %endmacro
 
 %macro ?lowercase 2
-	_range %1, 'a', 'z', %2
+	?range %1, 'a', 'z', %2
 %endmacro
 
 %macro _peak 2							;_peak stream error
@@ -76,24 +76,40 @@ _start:
 main:
 			_prologue
 			mov [p_cell], 0
-
 .loop:
-			_print s_prompt
-			push LB_SIZE - 1
-			push line_buf
-			push stdin
-			call file_read_line
-			add esp, 12
+			?call1 consume_whitespace, stdin, .error
+			_peak stdin, .error
+			mov ebx, eax
 
+			?number ebx, jnz .number
+			?lowercase ebx, jnz .operator
+
+.bad_token:
+			_print s_invalidt
+			?call1 consume_non_whitespace, stdin, .error
+			jmp .reloop
+
+.stack_overflow:
+			_print s_overflow
+			jmp .reloop
+
+			;TODO
+.number:
+			call expect_number
 			cmp eax, 0
-			jge .process
+			jl .bad_token				; shouldn't happen
+			jmp .reloop
 
-			_print s_error
-			jmp .ret
-.process:
-			mov [line_buf + eax], 0
-			_print line_buf
+
+			;TODO
+.operator:
+			?call1 consume_non_whitespace, stdin, .error
+
+.reloop:
 			jmp .loop
+
+.error:
+			_print s_error
 
 .ret:
 			_epilogue
@@ -105,6 +121,9 @@ main:
 ; Functions:
 ; expect_number()
 ; range(value, lower, upper)
+; is_whitespace(val)
+; consume_whitespace(stream)
+; print(s)
 
 ; IN: None
 ; OUT: eax = parsed number or negative on fail
@@ -172,15 +191,15 @@ is_whitespace:								;is_whitespace(val)
 
 			cmp ecx, ' '
 			je .ret
-			cmp ecx, '\t'
+			cmp ecx, 9	 					;'\t'
 			je .ret
-			cmp ecx, '\n'
+			cmp ecx, 10 					;'\n'
 			je .ret
-			cmp ecx, '\v'
+			cmp ecx, 11						;'\v'
 			je .ret
-			cmp ecx, '\f'
+			cmp ecx, 12 					;'\f'
 			je .ret
-			cmp ecx, '\r'
+			cmp ecx, 12 					;'\r'
 			je .ret
 
 			mov eax, 0
@@ -196,6 +215,23 @@ consume_whitespace:							;consume_whitespace(stream)
 			@call1 is_whitespace, eax
 			test eax, eax
 			jz .good
+
+			_get _ARG(0), .ret
+			jmp .loop
+.good:
+			mov eax, 0
+.ret:
+			_epilogue
+
+; IN: stream
+; OUT: eax = negative on error
+consume_non_whitespace:						;consume_non_whitespace(stream)
+			_prologue
+			_peak _ARG(0), .ret
+.loop:
+			@call1 is_whitespace, eax
+			test eax, eax
+			jnz .good
 
 			_get _ARG(0), .ret
 			jmp .loop
@@ -227,6 +263,44 @@ print:										;print()
 			push stdout
 			call file_write
 			
+			_epilogue
+
+; IN: value to push
+; OUT: eax = negative on overflow
+push_cell:
+			_prologue
+			mov edx, [p_cell]
+			inc edx
+
+			cmp edx, CELL_COUNT
+			jge .bad
+
+			mov [p_cell], edx
+			mov [cells + edx], eax
+			mov eax, 0
+			jmp .ret
+
+.bad:
+			mov eax, -1
+.ret:
+			_epilogue
+
+; IN: none
+; OUT: eax = negative on overflow, edx = value on success
+pop_cell:
+			_prologue
+			mov ecx, [p_cell]
+			dec ecx
+			cmp ecx, 0
+			jl .bad
+
+			mov [p_cell], ecx
+			mov edx, [cells + ecx + 4]
+			mov eax, 0
+			jmp .ret
+.bad:
+			mov eax, -1
+.ret:
 			_epilogue
 
 ; FILE IO
@@ -472,3 +546,4 @@ s_error: 		db "an error occured", 10, 0
 s_rec:			db "received new line", 10, 0
 s_overflow		db "stack overflow", 10, 0
 s_underflow		db "stack underflow", 10, 0
+s_invalidt		db "invalid token", 10, 0

@@ -52,13 +52,21 @@ endstruc
 	@call1 print, %1
 %endmacro
 
-%macro _putc 3							;_putc stream, char, error
+%macro ?call2 4							;_call2 func, arg1, arg2, error
+	push %3
 	push %2
-	push %1
-	call file_putc
+	call %1
 	add esp, 8
 	cmp eax, eax
-	jl %3
+	jl %4
+%endmacro
+
+%macro _putc 3							;_putc stream, char, error
+	?call2 file_putc, %1, %2, %3
+%endmacro
+
+%macro _wnum 3							;_wnum stream, num, error
+	?call2 file_write_num, %1, %2, %3
 %endmacro
 
 ; INTERPRETER/main
@@ -119,6 +127,10 @@ main:
 			?call1 consume_non_whitespace, stdin, .error
 
 .reloop:
+			call print_stack
+			cmp eax, 0
+			jl .error
+
 			jmp .loop
 
 .error:
@@ -323,6 +335,32 @@ pop_cell:									;pop_cell()
 			mov eax, -1
 			mov [p_cell], 0
 .ret:
+			_epilogue
+
+; IN: none
+; OUT: eax = negative on error
+print_stack:								;print_stack()
+			_prologue
+			push ebx
+			mov ebx, 0
+.loop:
+			cmp ebx, [p_cell]
+			jge .finish
+
+			lea eax, [cells + 4 * ebx]
+			_wnum stdout, [eax], .error
+			_putc stdout, ' ', .error
+
+			inc ebx
+			jmp .loop
+
+.finish:
+			_putc stdout, 10, .error
+			mov eax, 0
+.error:
+.ret:
+			lea esp, _SLOT(1)
+			pop ebx
 			_epilogue
 
 ; FILE IO
@@ -553,7 +591,7 @@ file_write_num:								; file_write_num (file*, number)
 			test edi, edi
 			jz .zero
 
-			add esp, 32
+			sub esp, 32						; alloc space
 .loop:
 			cmp edi, 0
 			je .print
@@ -571,7 +609,7 @@ file_write_num:								; file_write_num (file*, number)
 			mov edi, eax
 			add edx, '0'
 
-			mov eax, esp
+			lea eax, [esp + 32]				; save from end
 			sub eax, esi
 			mov [eax], dl
 			jmp .loop
@@ -584,7 +622,7 @@ file_write_num:								; file_write_num (file*, number)
 			; x
 
 .print:
-			mov eax, esp
+			lea eax, [esp + 32]				; load from end
 			sub eax, esi
 
 			push esi						; count
@@ -598,8 +636,8 @@ file_write_num:								; file_write_num (file*, number)
 			; x
 .error:
 			mov eax, -1
-.ret
-			mov esp, _SLOT(2)
+.ret:
+			lea esp, _SLOT(2)
 			pop edi
 			pop esi
 			_epilogue

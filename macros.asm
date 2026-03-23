@@ -44,7 +44,7 @@
 	push %2
 	call %1
 	add esp, 8
-	cmp eax, eax
+	cmp eax, 0
 	jl %4
 %endmacro
 

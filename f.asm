@@ -119,24 +119,28 @@ _start:
 
 main:
 			_prologue
-			sub esp, M_SYM_NAME		; _SLOT(1) = token
+			push esi
+			push edi
+			push ebx
+			sub esp, M_SYM_NAME		; _SLOT(4) = token
 			mov [p_cell], 0
 .loop:
 			?call1 consume_whitespace, stdin, .error
-			lea eax, _SLOT(1)
+			lea eax, _SLOT(4)
 			?call1 expect_token, eax, .error
 
-			lea ecx, _SLOT(1)
+			lea ecx, _SLOT(4)
 			push eax				;length
 			push ecx				;buffer
 			call try_parse_number
-			add esp, 4
-			pop ecx					;ecx has token length
+			pop edi					;edi has buffer
+			pop esi					;esi has token length
 
 			cmp eax, 0
 			jge .number				;edx has number
 
 .operator:
+			?call2 find_word, edi, esi, .bad_token
 			jmp .reloop
 
 .number:							;edx has number
@@ -161,6 +165,10 @@ main:
 			_print s_error
 
 .ret:
+			lea esp, _SLOT(3)
+			pop ebx
+			pop edi
+			pop esi
 			_epilogue
 
 
@@ -174,6 +182,7 @@ main:
 ; is_whitespace(val)
 ; consume_whitespace(stream)
 ; print(s)
+; strncmp(buf_a, buf_b, length)
 
 ; IN: buffer, length
 ; OUT: eax = negative on not number, edx = parsed number if success
@@ -362,16 +371,62 @@ fprint:										;fprint(file*, cstring)
 			call file_write
 			_epilogue
 
+; IN: buf_a, buf_b, length
+; OUT: eax = -1 l, 0 eq, 1 g
+; compare two strings of given length
+strncmp:									;strncmp(buf_a, buf_b, length)
+			_prologue
+			push esi
+			push edi
+			push ebx
+
+			mov esi, _ARG(0)
+			mov edi, _ARG(1)
+			mov ebx, 0
+
+.loop:
+			cmp ebx, _ARG(2)
+			jge .eq
+
+			mov cl, [esi]
+			mov dl, [esi]
+
+			cmp cl, dl
+			jl .lt
+			jg .gt
+
+			inc esi
+			inc edi
+			inc ebx
+			jmp .loop
+			
+.gt:
+			mov eax, 1
+			jmp .ret
+.lt:
+			mov eax, -1
+			jmp .ret
+.eq:
+			mov eax, 0
+.ret:
+			lea esp, _SLOT(3)
+			pop ebx
+			pop edi
+			pop esi
+			_epilogue
+
 ; FORTH
 ; =============================================================================
 		section .text
 ; Functions:
 ; push_cell(val)
 ; pop_cell()
+; find_word(buf, length)
 
 ; Globals:
 ; p_cell
 ; cells
+; dictionary
 
 ; IN: value to push
 ; OUT: eax = FE_OVER on overflow
@@ -435,6 +490,44 @@ print_stack:								;print_stack()
 			pop ebx
 			_epilogue
 
+; IN: buf, length
+; OUT: eax = FE_NONE or 0, edx = fword* on success
+; searches dictionary for word with given name
+find_word:									;find_word(buf, length)
+			_prologue
+			push esi
+
+			mov esi, dictionary.root
+.loop
+			mov eax, [esi + fword.nl]
+			cmp eax, _ARG(1)
+			jnz .cont
+
+			push _ARG(1)					;same length
+			push [esi + fword.name]
+			push _ARG(0)
+			call strncmp
+			add esp, 12
+
+			test eax, eax
+			jnz .cont
+
+			mov eax, 0						;same name = found
+			mov edx, esi
+			jmp .ret
+.cont	
+			mov esi, [esi + fword.next]
+			test esi, esi
+			jz .error
+			jmp .loop
+
+.error
+			mov eax, FE_NONE
+.ret
+
+			lea esp, _SLOT(1)
+			pop esi
+			_epilogue
 
 
 intrinsic_add:								;intrinsic_add (n1 n2 -- n1 + n2)
@@ -786,6 +879,7 @@ s_operator		db "operator", 10, 0
 s_number 		db "number", 10, 0
 
 dictionary: 	align 32
+.root:
 .sub:			defword "-", intrinsic_add, .add
 .add:			defword "+", intrinsic_sub, .dot
 .dot:			defword ".", intrinsic_dot, 0

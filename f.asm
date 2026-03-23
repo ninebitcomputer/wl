@@ -9,13 +9,27 @@ SYS_EXIT	equ 1
 BUF_SIZE	equ 128
 LB_SIZE		equ 64
 
-CELL_COUNT	equ 2
+M_SYM_NAME	equ 32
+M_SYM_SLOTS equ M_SYM_NAME / 4
+CELL_COUNT	equ 1024
+
+FE_OVER 	equ -1
+FE_UNDER	equ -2
+FE_IO		equ -3
+FE_NONE		equ -4
 
 struc file
 	.start:	resd 1
 	.end:	resd 1
 	.desc:	resd 1
 	.buf:	resb BUF_SIZE
+endstruc
+
+struc fword
+	.next:	resd 1
+	.fp:	resd 1
+	.nl:	resd 1
+	.name:	resb 32
 endstruc
 
 %macro ?range 4							;_range val low behavior
@@ -36,6 +50,10 @@ endstruc
 	?range %1, 'a', 'z', %2
 %endmacro
 
+%macro ?printable 2
+	?range %1, '!', '~', %2
+%endmacro
+
 %macro _peak 2							;_peak stream error
 	?call1 file_peakc, %1, %2
 %endmacro
@@ -52,21 +70,30 @@ endstruc
 	@call1 print, %1
 %endmacro
 
-%macro ?call2 4							;_call2 func, arg1, arg2, error
-	push %3
-	push %2
-	call %1
-	add esp, 8
-	cmp eax, eax
-	jl %4
-%endmacro
-
 %macro _putc 3							;_putc stream, char, error
 	?call2 file_putc, %1, %2, %3
 %endmacro
 
 %macro _wnum 3							;_wnum stream, num, error
 	?call2 file_write_num, %1, %2, %3
+%endmacro
+
+%macro _pop_cell 1						;_pop_cell underflow
+	?call pop_cell, %1
+%endmacro
+
+%macro _push_cell 2						;_push_cell val, overflow
+	?call1 push_cell, %1, %2
+%endmacro
+
+%macro defword 3						;defword name, fp, next
+	dd %3 								; next
+	dd %2 								; fp
+
+	%strlen __len %1
+	dd __len 							; nl
+	db %1 								; name + padding
+    times (32 - __len) db 0
 %endmacro
 
 ; INTERPRETER/main
@@ -92,14 +119,30 @@ _start:
 
 main:
 			_prologue
+			sub esp, M_SYM_NAME		; _SLOT(1) = token
 			mov [p_cell], 0
 .loop:
 			?call1 consume_whitespace, stdin, .error
-			_peak stdin, .error
-			mov ebx, eax
+			lea eax, _SLOT(1)
+			?call1 expect_token, eax, .error
 
-			?number ebx, jnz .number
-			?lowercase ebx, jnz .operator
+			lea ecx, _SLOT(1)
+			push eax				;length
+			push ecx				;buffer
+			call try_parse_number
+			add esp, 4
+			pop ecx					;ecx has token length
+
+			cmp eax, 0
+			jge .number				;edx has number
+
+.operator:
+			jmp .reloop
+
+.number:							;edx has number
+			?call1 push_cell, edx, .stack_overflow
+.reloop:
+			jmp .loop
 
 .bad_token:
 			_print s_invalidt
@@ -114,25 +157,6 @@ main:
 			_print s_underflow
 			jmp .error
 
-			;TODO
-.number:
-			call expect_number
-			cmp eax, 0
-			jl .error				; shouldn't happen
-			?call1 push_cell, eax, .stack_overflow
-
-			jmp .reloop
-			;TODO
-.operator:
-			?call1 consume_non_whitespace, stdin, .error
-
-.reloop:
-			call print_stack
-			cmp eax, 0
-			jl .error
-
-			jmp .loop
-
 .error:
 			_print s_error
 
@@ -145,12 +169,11 @@ main:
 		section .text
 ; Functions:
 ; expect_number()
+; expect_token(buf)
 ; range(value, lower, upper)
 ; is_whitespace(val)
 ; consume_whitespace(stream)
 ; print(s)
-; push_cell(val)
-; pop_cell()
 
 ; IN: None
 ; OUT: eax = parsed number or negative on fail
@@ -189,6 +212,81 @@ expect_number:								;expect_number
 			lea esp, _SLOT(2)
 			pop edi
 			pop esi
+			_epilogue
+
+; IN: buffer, length
+; OUT: eax = negative on not number, edx = parsed number if success
+try_parse_number:
+			_prologue
+			push esi
+			push edi
+			mov esi, 0						;result
+			mov edi, 0 						;count
+
+.loop:
+			cmp edi, _ARG(1)
+			jge .finish
+
+			mov eax, _ARG(0)
+			add eax, edi
+
+			movzx eax, byte [eax]
+			push eax
+			?number eax, jz .error
+			pop eax
+
+			sub eax, '0'
+			imul esi, 10
+			add esi, eax
+
+			inc edi
+			jmp .loop
+.finish:
+			mov eax, 0
+			mov edx, esi
+			jmp .ret
+
+.error:
+			mov eax, -1
+
+.ret:
+			lea esp, _SLOT(2)
+			pop edi
+			pop esi
+			_epilogue
+
+; IN: pointer to buffer of size M_SYM_NAME
+; OUT: eax = token length or negative on error
+; reads a token from stdin
+expect_token:								;expect_token(buf)
+			_prologue
+			push ebx
+			mov ebx, 0
+
+.loop:
+			cmp ebx, M_SYM_NAME
+			jge .bad
+
+			_peak stdin, .bad
+			?printable eax, jz .finish
+			_get stdin, .bad
+
+			mov ecx, _ARG(0)
+			mov [ecx + ebx], al
+
+			inc ebx
+			jmp .loop
+.finish:
+			mov eax, ebx
+			cmp ebx, 0
+			jg .ret
+
+.bad:
+			mov eax, -1
+
+.ret:
+			lea esp, _SLOT(1)
+			pop ebx
 			_epilogue
 
 ; IN: val, low, high
@@ -303,8 +401,19 @@ fprint:										;fprint(file*, cstring)
 			call file_write
 			_epilogue
 
+; FORTH
+; =============================================================================
+		section .text
+; Functions:
+; push_cell(val)
+; pop_cell()
+
+; Globals:
+; p_cell
+; cells
+
 ; IN: value to push
-; OUT: eax = negative on overflow
+; OUT: eax = FE_OVER on overflow
 push_cell:									;push_cell(val)
 			_prologue
 			mov edx, [p_cell]
@@ -317,12 +426,12 @@ push_cell:									;push_cell(val)
 			jmp .ret
 
 .bad:
-			mov eax, -1
+			mov eax, FE_OVER
 .ret:
 			_epilogue
 
 ; IN: none
-; OUT: eax = negative on overflow, edx = value on success
+; OUT: eax = FE_UNDER on underflow, edx = value on success
 pop_cell:									;pop_cell()
 			_prologue
 			dec [p_cell]
@@ -334,7 +443,7 @@ pop_cell:									;pop_cell()
 			mov eax, 0
 			jmp .ret
 .underflow:
-			mov eax, -1
+			mov eax, FE_UNDER
 			mov [p_cell], 0
 .ret:
 			_epilogue
@@ -363,6 +472,45 @@ print_stack:								;print_stack()
 .ret:
 			lea esp, _SLOT(1)
 			pop ebx
+			_epilogue
+
+
+
+intrinsic_add:								;intrinsic_add (n1 n2 -- n1 + n2)
+			_prologue
+
+			_pop_cell .ret
+			push edx
+			_pop_cell .ret
+			pop ecx
+			add edx, ecx
+			_push_cell edx, .ret
+			mov eax, 0
+.ret:
+			_epilogue
+
+intrinsic_sub:								;intrinsic_sub (n1 n2 -- n1 - n2)
+			_prologue
+
+			_pop_cell .ret
+			push edx
+			_pop_cell .ret
+			pop ecx
+			sub edx, ecx
+			_push_cell edx, .ret
+			mov eax, 0
+.ret:
+			_epilogue
+
+intrinsic_dot:
+			_prologue
+
+			_pop_cell .ret
+			_wnum stdout, edx, .io_err
+			jmp .ret
+.io_err:
+			mov eax, FE_IO
+.ret:
 			_epilogue
 
 ; FILE IO
@@ -673,3 +821,11 @@ s_rec:			db "received new line", 10, 0
 s_overflow		db "stack overflow", 10, 0
 s_underflow		db "stack underflow", 10, 0
 s_invalidt		db "invalid token", 10, 0
+s_operator		db "operator", 10, 0
+s_number 		db "number", 10, 0
+
+dictionary: 	align 32
+.sub:			defword "-", intrinsic_add, .add
+.add:			defword "+", intrinsic_sub, .dot
+.dot:			defword ".", intrinsic_dot, 0
+

@@ -8,6 +8,13 @@
 	ret
 %endmacro
 
+%macro ?call 2							;@call function error
+	call %1
+	cmp eax, 0
+	jl %2
+%endmacro
+
+
 %macro @call1 2							;@call1 function input
 	push %2
 	call %1
@@ -20,17 +27,27 @@
 	pop %3
 %endmacro
 
-%macro ?call1 3							;?call1 jump if return <0
+%macro ?call1 3							;?call1 func, arg1, error
 	@call1 %1, %2
 	cmp eax, 0
 	jl %3
 %endmacro
 
-%macro ?call1 4							;?call1 jump if return <0 + recover
+%macro ?call1 4							;?call1 func, arg1, error, recover
 	@call1 %1, %2, %4
 	cmp eax, 0
 	jl %3
 %endmacro
+
+%macro ?call2 4							;_call2 func, arg1, arg2, error
+	push %3
+	push %2
+	call %1
+	add esp, 8
+	cmp eax, eax
+	jl %4
+%endmacro
+
 
 %define _arg(n) ebp + 8 + 4*(n)
 %define _ARG(n) [_arg(n)]

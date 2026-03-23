@@ -141,12 +141,25 @@ main:
 
 .operator:
 			?call2 find_word, edi, esi, .bad_token
+
+			mov eax, [edx + fword.fp]
+			call eax
+			cmp eax, 0
+			jl .runtime_error
+
 			jmp .reloop
 
 .number:							;edx has number
-			?call1 push_cell, edx, .stack_overflow
+			_push_cell edx, .stack_overflow
 .reloop:
 			jmp .loop
+
+.runtime_error:
+			cmp eax, FE_OVER
+			je .stack_overflow
+			cmp eax, FE_UNDER
+			je .stack_underflow
+			jmp .error
 
 .bad_token:
 			_print s_invalidt
@@ -163,7 +176,8 @@ main:
 
 .stack_underflow:
 			_print s_underflow
-			jmp .error
+			?call1 consume_non_whitespace, stdin, .error
+			jmp .reloop
 
 .error:
 			_print s_error
@@ -440,8 +454,9 @@ push_cell:									;push_cell(val)
 			cmp edx, CELL_COUNT
 			jge .bad
 
+			mov eax, _ARG(0)
 			mov [cells + edx * 4], eax
-			inc [p_cell]
+			inc dword [p_cell]
 			mov eax, 0
 			jmp .ret
 
@@ -454,7 +469,7 @@ push_cell:									;push_cell(val)
 ; OUT: eax = FE_UNDER on underflow, edx = value on success
 pop_cell:									;pop_cell()
 			_prologue
-			dec [p_cell]
+			dec dword [p_cell]
 			mov ecx, [p_cell]
 			cmp ecx, 0
 			jl .underflow
@@ -464,7 +479,7 @@ pop_cell:									;pop_cell()
 			jmp .ret
 .underflow:
 			mov eax, FE_UNDER
-			mov [p_cell], 0
+			mov dword [p_cell], 0
 .ret:
 			_epilogue
 
@@ -502,7 +517,7 @@ find_word:									;find_word(buf, length)
 			push esi
 
 			mov esi, dictionary.root
-.loop
+.loop:
 			mov eax, [esi + fword.nl]
 			cmp eax, _ARG(1)
 			jnz .cont
@@ -520,52 +535,79 @@ find_word:									;find_word(buf, length)
 			mov eax, 0						;same name = found
 			mov edx, esi
 			jmp .ret
-.cont	
+.cont:	
 			mov esi, [esi + fword.next]
 			test esi, esi
 			jz .error
 			jmp .loop
 
-.error
+.error:
 			mov eax, FE_NONE
-.ret
+.ret:
 
 			lea esp, _SLOT(1)
 			pop esi
 			_epilogue
 
+; helpers for generating binary intrinsics
+; after sbintrins, edx has stack left, ecx has stack right
+; runtime errors should jump to .ret
+											
+%macro sbintrins 0							; sbintrins
+			_prologue
+			_pop_cell .ret
+			push edx
+			_pop_cell .ret
+			pop ecx
+%endmacro
+
+%macro ebintrins 0							; ebintrins
+			mov eax, 0
+.ret:
+			_epilogue
+%endmacro
+
 
 intrinsic_add:								;intrinsic_add (n1 n2 -- n1 + n2)
-			_prologue
+			sbintrins
 
-			_pop_cell .ret
-			push edx
-			_pop_cell .ret
-			pop ecx
 			add edx, ecx
 			_push_cell edx, .ret
-			mov eax, 0
-.ret:
-			_epilogue
+
+			ebintrins
 
 intrinsic_sub:								;intrinsic_sub (n1 n2 -- n1 - n2)
-			_prologue
+			sbintrins
 
-			_pop_cell .ret
-			push edx
-			_pop_cell .ret
-			pop ecx
 			sub edx, ecx
 			_push_cell edx, .ret
-			mov eax, 0
-.ret:
-			_epilogue
+
+			ebintrins
+
+intrinsic_mul:
+			sbintrins
+
+			mul edx, ecx
+			_push_cell edx, .ret
+
+			ebintrins
 
 intrinsic_dot:
 			_prologue
 
 			_pop_cell .ret
 			_wnum stdout, edx, .io_err
+			_putc stdout, 10, .io_err
+			jmp .ret
+.io_err:
+			mov eax, FE_IO
+.ret:
+			_epilogue
+
+intrinsic_print_stack:
+			_prologue
+			?call print_stack, .io_err
+			mov eax, 0
 			jmp .ret
 .io_err:
 			mov eax, FE_IO
@@ -680,7 +722,7 @@ file_putc:									;file_putc(file*, char)
 			mov dl, _ARG(1)
 			mov [ecx], dl
 
-			inc [eax + file.end]
+			inc dword [eax + file.end]
 
 			cmp [eax + file.end], BUF_SIZE
 			jge .flush
@@ -885,7 +927,9 @@ s_number 		db "number", 10, 0
 
 dictionary: 	align 32
 .root:
-.sub:			defword "-", intrinsic_add, .add
-.add:			defword "+", intrinsic_sub, .dot
-.dot:			defword ".", intrinsic_dot, 0
+.sub:			defword "-", intrinsic_sub, .add
+.add:			defword "+", intrinsic_add, .mul
+.mul:			defword "*", intrinsic_mul, .dot
+.dot:			defword ".", intrinsic_dot, .dots
+.dots:			defword ".s", intrinsic_print_stack, 0
 

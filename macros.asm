@@ -39,13 +39,23 @@
 	jl %3
 %endmacro
 
-%macro ?call2 4							;_call2 func, arg1, arg2, error
+%macro ?call2 4							;?call2 func, arg1, arg2, error
 	push %3
 	push %2
 	call %1
 	add esp, 8
 	cmp eax, 0
 	jl %4
+%endmacro
+
+%macro ?call3 5							;?call3 func, arg1, arg2, arg3, error
+	push %4
+	push %3
+	push %2
+	call %1
+	add esp, 12
+	cmp eax, 0
+	jl %5
 %endmacro
 
 

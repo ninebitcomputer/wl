@@ -152,6 +152,9 @@ main:
 			_print s_invalidt
 
 			?call1 consume_non_whitespace, stdin, .error
+			?call3 file_write, stdout, edi, esi, .error
+			_putc stdout, 10, .error
+
 			jmp .reloop
 
 .stack_overflow:
@@ -390,7 +393,7 @@ strncmp:									;strncmp(buf_a, buf_b, length)
 			jge .eq
 
 			mov cl, [esi]
-			mov dl, [esi]
+			mov dl, [edi]
 
 			cmp cl, dl
 			jl .lt
@@ -505,7 +508,8 @@ find_word:									;find_word(buf, length)
 			jnz .cont
 
 			push _ARG(1)					;same length
-			push [esi + fword.name]
+			lea eax, [esi + fword.name]
+			push eax
 			push _ARG(0)
 			call strncmp
 			add esp, 12
@@ -875,7 +879,7 @@ s_error: 		db "an error occured", 10, 0
 s_rec:			db "received new line", 10, 0
 s_overflow		db "stack overflow", 10, 0
 s_underflow		db "stack underflow", 10, 0
-s_invalidt		db "invalid token", 10, 0
+s_invalidt		db "invalid token: ", 0
 s_operator		db "operator", 10, 0
 s_number 		db "number", 10, 0
 

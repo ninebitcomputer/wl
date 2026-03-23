@@ -163,9 +163,11 @@ expect_number:								;expect_number
 
 .loop:
 			_peak stdin, .bad
+
 			?number eax, jz .save
 
 			_get stdin, .bad
+
 			sub eax, '0'
 
 			inc esi
@@ -237,8 +239,8 @@ is_whitespace:								;is_whitespace(val)
 ; OUT: eax = negative on error
 consume_whitespace:							;consume_whitespace(stream)
 			_prologue
-			_peak _ARG(0), .ret
 .loop:
+			_peak _ARG(0), .ret
 			@call1 is_whitespace, eax
 			test eax, eax
 			jz .good

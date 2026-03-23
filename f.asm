@@ -168,51 +168,12 @@ main:
 ; =============================================================================
 		section .text
 ; Functions:
-; expect_number()
+; try_parse_number(buffer, length)
 ; expect_token(buf)
 ; range(value, lower, upper)
 ; is_whitespace(val)
 ; consume_whitespace(stream)
 ; print(s)
-
-; IN: None
-; OUT: eax = parsed number or negative on fail
-expect_number:								;expect_number
-			_prologue
-			push esi
-			push edi
-			mov esi, 0						;count
-			mov edi, 0						;total
-
-.loop:
-			_peak stdin, .bad
-
-			?number eax, jz .save
-
-			_get stdin, .bad
-
-			sub eax, '0'
-
-			inc esi
-			imul edi, 10
-			add edi, eax
-
-			jmp .loop
-
-
-.save:
-			mov eax, edi
-			test esi, esi
-			; if no chars were parsed this isn't a number
-			jnz .ret
-.bad:
-			mov eax, -1
-
-.ret:
-			lea esp, _SLOT(2)
-			pop edi
-			pop esi
-			_epilogue
 
 ; IN: buffer, length
 ; OUT: eax = negative on not number, edx = parsed number if success

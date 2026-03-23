@@ -150,6 +150,7 @@ main:
 
 .bad_token:
 			_print s_invalidt
+
 			?call1 consume_non_whitespace, stdin, .error
 			jmp .reloop
 
@@ -324,8 +325,8 @@ consume_whitespace:							;consume_whitespace(stream)
 ; OUT: eax = negative on error
 consume_non_whitespace:						;consume_non_whitespace(stream)
 			_prologue
-			_peak _ARG(0), .ret
 .loop:
+			_peak _ARG(0), .ret
 			@call1 is_whitespace, eax
 			test eax, eax
 			jnz .good

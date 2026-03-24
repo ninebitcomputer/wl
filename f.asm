@@ -1,41 +1,7 @@
 %include "macros.asm"
+%include "common.asm"
 
 global _start
-
-SYS_WRITE	equ 4 	; unsigned int fd 	const char *buf 	size_t count
-SYS_READ	equ 3	; unsigned int fd   char* buf 			size_t count
-SYS_EXIT	equ 1
-
-BUF_SIZE	equ 128
-LB_SIZE		equ 64
-
-M_SYM_NAME	equ 32
-M_SYM_SLOTS equ M_SYM_NAME / 4
-CELL_COUNT	equ 1024
-
-; interpreter messages
-FM_ENDDEF	equ 2	; end word definition
-FM_BEGDEF   equ 1	; begin word definition
-
-; runtime errors
-FE_OVER 	equ -1	; stack overflow
-FE_UNDER	equ -2	; stack underflow
-FE_IO		equ -3	; IO error
-
-struc file
-	.start:	resd 1
-	.end:	resd 1
-	.desc:	resd 1
-	.buf:	resb BUF_SIZE
-endstruc
-
-struc fword
-	.next:	resd 1
-	.fp:	resd 1
-	.nl:	resd 1
-	.name:	resb 32
-endstruc
-
 %macro ?range 4							;_range val low behavior
 	push %3
 	push %2
@@ -935,8 +901,6 @@ p_cell:		align 4
 
 cells:		align 4
 			resb 4*CELL_COUNT
-
-line_buf: 	resb LB_SIZE
 
 ; DATA
 		section .data

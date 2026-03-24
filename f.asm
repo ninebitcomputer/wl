@@ -13,10 +13,14 @@ M_SYM_NAME	equ 32
 M_SYM_SLOTS equ M_SYM_NAME / 4
 CELL_COUNT	equ 1024
 
-FE_OVER 	equ -1
-FE_UNDER	equ -2
-FE_IO		equ -3
-FE_NONE		equ -4
+; interpreter messages
+FM_ENDDEF	equ 2	; end word definition
+FM_BEGDEF   equ 1	; begin word definition
+
+; runtime errors
+FE_OVER 	equ -1	; stack overflow
+FE_UNDER	equ -2	; stack underflow
+FE_IO		equ -3	; IO error
 
 struc file
 	.start:	resd 1
@@ -510,7 +514,7 @@ print_stack:								;print_stack()
 			_epilogue
 
 ; IN: buf, length
-; OUT: eax = FE_NONE or 0, edx = fword* on success
+; OUT: eax = negative or 0, edx = fword* on success
 ; searches dictionary for word with given name
 find_word:									;find_word(buf, length)
 			_prologue
@@ -542,7 +546,7 @@ find_word:									;find_word(buf, length)
 			jmp .loop
 
 .error:
-			mov eax, FE_NONE
+			mov eax, -1
 .ret:
 
 			lea esp, _SLOT(1)
@@ -591,6 +595,27 @@ intrinsic_mul:
 			_push_cell edx, .ret
 
 			ebintrins
+
+intrinsic_div:
+			sbintrins
+
+			mov eax, edx
+			mov edx, 0
+			idiv ecx						; eax := q, edx := r
+			_push_cell eax, .ret
+
+			ebintrins
+
+intrinsic_beg_def:
+			_prologue
+			mov eax, FM_BEGDEF
+			_epilogue
+
+intrinsic_end_def:
+			_prologue
+			mov eax, FM_ENDDEF
+			_epilogue
+
 
 intrinsic_dot:
 			_prologue
@@ -929,7 +954,11 @@ dictionary: 	align 32
 .root:
 .sub:			defword "-", intrinsic_sub, .add
 .add:			defword "+", intrinsic_add, .mul
-.mul:			defword "*", intrinsic_mul, .dot
-.dot:			defword ".", intrinsic_dot, .dots
+.mul:			defword "*", intrinsic_mul, .div
+.div:			defword "/", intrinsic_div, .dot
+.dot:			defword ".", intrinsic_dot, .bword
+.bword:			defword ":", intrinsic_beg_def, .eword
+.eword:			defword ";", intrinsic_end_def, .dots
 .dots:			defword ".s", intrinsic_print_stack, 0
+
 

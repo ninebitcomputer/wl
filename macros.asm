@@ -65,3 +65,7 @@
 %define _slot(n) ebp - 4*(n)
 %define _SLOT(n) [_slot(n)]
 
+;defines a macro name(input, err) that expands to ?call1 function, name, err
+%macro FALLIBLE1 2						;FAILLBLE1 name, function
+    %define %1(input, err) ?call1 %2, input, err
+%endmacro

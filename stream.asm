@@ -184,7 +184,8 @@ file_peakc:									;file_peakc(file*)
 file_getc:									;file_getc(file*)
 			_prologue
 
-			_peak _ARG(0), .ret, ecx
+			_peak _ARG(0), .ret
+			mov ecx, _ARG(0)
 			inc dword [ecx + file.start]
 			
 .ret:

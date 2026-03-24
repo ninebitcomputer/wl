@@ -33,9 +33,6 @@ endstruc
 	?call1 file_peakc, %1, %2
 %endmacro
 
-%macro _peak 3
-	?call1 file_peakc, %1, %2, %3		;_peak stream error recover
-%endmacro
 
 %macro _get 2							;_get stream error
 	?call1 file_getc, %1, %2

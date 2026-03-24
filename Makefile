@@ -3,8 +3,8 @@
 %.o: %.asm
 	nasm -f elf32 -o $@ $<	
 
-f: f.o
-	ld f.o -m elf_i386 -o f
+f: f.o stream.o
+	ld f.o stream.o -m elf_i386 -o f
 
 run: f
 	./f

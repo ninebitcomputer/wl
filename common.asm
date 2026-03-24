@@ -8,13 +8,16 @@ SYS_EXIT	equ 1
 ; FILE IO
 ; =============================================================================
 
-global file_init					;(file*, desc)
-global file_buffer_reset			;(file*)
-global file_buffer_read				;(file*)
-global file_buffer_flush			;(file*)
-global file_peakc					;(file*)
-global file_getc					;(file*)
-global file_read_line				;(file*)
+extern file_init					;file_init(file*, desc)
+extern file_buffer_reset			;file_buffer_reset(file*)
+extern file_buffer_read				;file_buffer_read(file*)
+extern file_buffer_flush			;file_buffer_flush(file*)
+extern file_peakc					;file_peakc(file*)
+extern file_getc					;file_getc(file*)
+extern file_putc					;file_putc(file*, char)
+extern file_read_line				;file_read_line(file*)
+extern file_write 					;file_write(file*, buf, length)
+extern file_write_num 				;file_write_num(file*, number)
 
 BUF_SIZE	equ 128
 struc file

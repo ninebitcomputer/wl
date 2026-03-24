@@ -107,25 +107,25 @@ main:
 			jmp .error
 
 .bad_token:
-			_print s_invalidt
+			Print(s_invalidt)
 
 			?call1 consume_non_whitespace, stdin, .error
 			?call3 file_write, stdout, edi, esi, .error
-			_putc stdout, 10, .error
+			Putc(stdout, 10, .error)
 
 			jmp .reloop
 
 .stack_overflow:
-			_print s_overflow
+			Print(s_overflow)
 			jmp .error
 
 .stack_underflow:
-			_print s_underflow
+			Print(s_underflow)
 			?call1 consume_non_whitespace, stdin, .error
 			jmp .reloop
 
 .error:
-			_print s_error
+			Print(s_error)
 
 .ret:
 			lea esp, _SLOT(3)
@@ -200,9 +200,9 @@ expect_token:								;expect_token(buf)
 			cmp ebx, M_SYM_NAME
 			jge .bad
 
-			_peak stdin, .bad
+			Peak(stdin, .bad)
 			?printable eax, jz .finish
-			_get stdin, .bad
+			Get(stdin, .bad)
 
 			mov ecx, _ARG(0)
 			mov [ecx + ebx], al
@@ -271,12 +271,12 @@ is_whitespace:								;is_whitespace(val)
 consume_whitespace:							;consume_whitespace(stream)
 			_prologue
 .loop:
-			_peak _ARG(0), .ret
+			Peak(_ARG(0), .ret)
 			@call1 is_whitespace, eax
 			test eax, eax
 			jz .good
 
-			_get _ARG(0), .ret
+			Get(_ARG(0), .ret)
 			jmp .loop
 .good:
 			mov eax, 0
@@ -288,12 +288,12 @@ consume_whitespace:							;consume_whitespace(stream)
 consume_non_whitespace:						;consume_non_whitespace(stream)
 			_prologue
 .loop:
-			_peak _ARG(0), .ret
+			Peak(_ARG(0), .ret)
 			@call1 is_whitespace, eax
 			test eax, eax
 			jnz .good
 
-			_get _ARG(0), .ret
+			Get(_ARG(0), .ret)
 			jmp .loop
 .good:
 			mov eax, 0
@@ -439,14 +439,14 @@ print_stack:								;print_stack()
 			jge .finish
 
 			lea eax, [cells + 4 * ebx]
-			_wnum stdout, [eax], .error
-			_putc stdout, ' ', .error
+			Wnum(stdout, [eax], .error)
+			Putc(stdout, ' ', .error)
 
 			inc ebx
 			jmp .loop
 
 .finish:
-			_putc stdout, 10, .error
+			Putc(stdout, 10, .error)
 			mov eax, 0
 .error:
 .ret:
@@ -562,8 +562,8 @@ intrinsic_dot:
 			_prologue
 
 			_pop_cell .ret
-			_wnum stdout, edx, .io_err
-			_putc stdout, 10, .io_err
+			Wnum(stdout, edx, .io_err)
+			Putc(stdout, 10, .io_err)
 			jmp .ret
 .io_err:
 			mov eax, FE_IO

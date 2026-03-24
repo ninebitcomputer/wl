@@ -255,7 +255,7 @@ file_write_num:								; file_write_num (file*, number)
 			jmp .loop
 			
 .zero:
-			_putc _ARG(0), '0', .error
+			Putc(_ARG(0), '0', .error)
 
 			mov eax, 0
 			jmp .ret

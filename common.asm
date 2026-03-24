@@ -29,29 +29,14 @@ struc file
 	.buf:	resb BUF_SIZE
 endstruc
 
-%macro _peak 2							;_peak stream error
-	?call1 file_peakc, %1, %2
-%endmacro
 
-FALLIBLE1 Peak, file_peakc
+FALLIBLE1 Peak, file_peakc			;Peak(stream)
+FALLIBLE1 Get, file_getc			;Get(stream)
 
-%macro _get 2							;_get stream error
-	?call1 file_getc, %1, %2
-%endmacro
+FALLIBLE2 Putc, file_putc			;Putc(stream, char)
+FALLIBLE2 Wnum, file_write_num		;Wnum(stream, number)
 
-%macro _putc 3							;_putc stream, char, error
-	?call2 file_putc, %1, %2, %3
-%endmacro
-
-%macro _print 1
-	@call1 print, %1
-%endmacro
-
-
-%macro _wnum 3							;_wnum stream, num, error
-	?call2 file_write_num, %1, %2, %3
-%endmacro
-
+FUNCTION1 Print, print				;Print(buf)
 ; WL FORTH
 ; =============================================================================
 

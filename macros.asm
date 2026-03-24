@@ -66,6 +66,14 @@
 %define _SLOT(n) [_slot(n)]
 
 ;defines a macro name(input, err) that expands to ?call1 function, name, err
-%macro FALLIBLE1 2						;FAILLBLE1 name, function
+%macro FALLIBLE1 2						;FALLIBLE1 name, function
     %define %1(input, err) ?call1 %2, input, err
+%endmacro
+
+%macro FALLIBLE2 2						;FALLIBLE2 name, function
+    %define %1(input1, input2, err) ?call2 %2, input1, input2, err
+%endmacro
+
+%macro FUNCTION1 2
+    %define %1(input) @call1 %2, input
 %endmacro

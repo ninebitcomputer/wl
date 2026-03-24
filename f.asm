@@ -1,5 +1,7 @@
 %include "common.asm"
 
+FUNCTION1 Print, print				;Print(buf)
+
 global _start
 %macro ?range 4							;_range val low behavior
 	push %3

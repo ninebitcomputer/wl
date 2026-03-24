@@ -1,4 +1,3 @@
-%include "macros.asm"
 %include "common.asm"
 ; FILE IO
 ; =============================================================================
@@ -13,18 +12,6 @@
 ;file_read_line(file*)
 ;file_write(file*, buf, length)
 ;file_write_num(file*, number)
-
-%macro _peak 2							;_peak stream error
-	?call1 file_peakc, %1, %2
-%endmacro
-
-%macro _peak 3
-	?call1 file_peakc, %1, %2, %3		;_peak stream error recover
-%endmacro
-
-%macro _putc 3							;_putc stream, char, error
-	?call2 file_putc, %1, %2, %3
-%endmacro
 
 		section .text
 

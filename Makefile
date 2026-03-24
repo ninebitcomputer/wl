@@ -1,6 +1,6 @@
 .PHONY: run
 
-%.o: %.asm
+%.o: %.asm common.asm
 	nasm -f elf32 -o $@ $<	
 
 f: f.o stream.o

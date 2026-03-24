@@ -30,11 +30,11 @@ struc file
 endstruc
 
 
-FALLIBLE1 Peak, file_peakc			;Peak(stream)
-FALLIBLE1 Get, file_getc			;Get(stream)
+FALLIBLE1 Peak, file_peakc			;Peak(stream, .err)
+FALLIBLE1 Get, file_getc			;Get(stream, .err)
 
-FALLIBLE2 Putc, file_putc			;Putc(stream, char)
-FALLIBLE2 Wnum, file_write_num		;Wnum(stream, number)
+FALLIBLE2 Putc, file_putc			;Putc(stream, char, .err)
+FALLIBLE2 Wnum, file_write_num		;Wnum(stream, number, .err)
 
 FUNCTION1 Print, print				;Print(buf)
 ; WL FORTH

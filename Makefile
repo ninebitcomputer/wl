@@ -1,8 +1,8 @@
 .PHONY: run clean
 
 clean:
-	rm f
-	rm *.o
+	rm -f f
+	rm -f *.o
 
 %.o: %.asm common.asm
 	nasm -f elf32 -o $@ $<	

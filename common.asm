@@ -61,3 +61,33 @@ endstruc
 
 ; UTILITIES
 ; =============================================================================
+extern try_parse_number 			;try_parse_number(buffer, length)
+extern expect_token					;expect_token(buf)
+extern range						;range(value, lower, upper)
+extern is_whitespace			 	;is_whitespace(val)
+extern consume_whitespace			;consume_whitespace(stream)
+extern consume_non_whitespace		;consume_non_whitespace(stream)
+extern print 						;print(s)
+extern strncmp						;strncmp(buf_a, buf_b, length)
+
+%macro ?range 4							;_range val low behavior
+	push %3
+	push %2
+	push %1
+	call range
+	add esp, 12
+	test eax, eax
+	%4
+%endmacro
+
+%macro ?number 2
+	?range %1, '0', '9', %2
+%endmacro
+
+%macro ?lowercase 2
+	?range %1, 'a', 'z', %2
+%endmacro
+
+%macro ?printable 2
+	?range %1, '!', '~', %2
+%endmacro

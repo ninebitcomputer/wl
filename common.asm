@@ -62,13 +62,16 @@ endstruc
 ; UTILITIES
 ; =============================================================================
 extern try_parse_number 			;try_parse_number(buffer, length)
-extern expect_token					;expect_token(buf)
+extern expect_token					;expect_token(stream, buf)
 extern range						;range(value, lower, upper)
 extern is_whitespace			 	;is_whitespace(val)
 extern consume_whitespace			;consume_whitespace(stream)
 extern consume_non_whitespace		;consume_non_whitespace(stream)
 extern print 						;print(s)
 extern strncmp						;strncmp(buf_a, buf_b, length)
+
+FALLIBLE3 TryParseNumber, try_parse_number
+FALLIBLE2 ExpectToken, expect_token
 
 %macro ?range 4							;_range val low behavior
 	push %3

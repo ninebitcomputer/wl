@@ -74,6 +74,10 @@
     %define %1(input1, input2, err) ?call2 %2, input1, input2, err
 %endmacro
 
+%macro FALLIBLE3 2						;FALLIBLE3 name, function
+    %define %1(input1, input2, input3, err) ?call3 %2, input1, input2, input3, err
+%endmacro
+
 %macro FUNCTION1 2
     %define %1(input) @call1 %2, input
 %endmacro

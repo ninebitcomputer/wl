@@ -58,7 +58,7 @@ main:
 .loop:
 			?call1 consume_whitespace, stdin, .error
 			lea eax, _SLOT(4)
-			?call1 expect_token, eax, .error
+			ExpectToken(stdin, eax, .error)
 
 			lea ecx, _SLOT(4)
 			push eax				;length

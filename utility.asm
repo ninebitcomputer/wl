@@ -13,6 +13,7 @@ extern stdin
 ; range(value, lower, upper)
 ; is_whitespace(val)
 ; consume_whitespace(stream)
+; consume_non_whitespace(stream)
 ; print(s)
 ; strncmp(buf_a, buf_b, length)
 
@@ -57,10 +58,10 @@ try_parse_number:
 			pop esi
 			_epilogue
 
-; IN: pointer to buffer of size M_SYM_NAME
+; IN: stream, pointer to buffer of size M_SYM_NAME
 ; OUT: eax = token length or negative on error
-; reads a token from stdin
-expect_token:								;expect_token(buf)
+; reads a token from stream
+expect_token:								;expect_token(stream, buf)
 			_prologue
 			push ebx
 			mov ebx, 0
@@ -69,11 +70,11 @@ expect_token:								;expect_token(buf)
 			cmp ebx, M_SYM_NAME
 			jge .bad
 
-			Peak(stdin, .bad)
+			Peak(_ARG(0), .bad)
 			?printable eax, jz .finish
 			Get(stdin, .bad)
 
-			mov ecx, _ARG(0)
+			mov ecx, _ARG(1)
 			mov [ecx + ebx], al
 
 			inc ebx

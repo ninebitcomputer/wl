@@ -134,6 +134,24 @@ main:
 ; cells
 ; dictionary
 
+; load address of next word, jump
+%macro NEXT 0
+  lodsw
+  jmp [eax]
+%endmacro
+
+%macro EXIT 0
+  pop esi
+  NEXT
+%endmacro
+
+; save esi 
+docol:
+  push esi
+  add eax, 4
+  mov esi, eax
+  NEXT
+  
 ; IN: value to push
 ; OUT: eax = FE_OVER on overflow
 push_cell:									;push_cell(val)
@@ -363,5 +381,3 @@ dictionary: 	align 32
 .bword:			defword ":", intrinsic_beg_def, .eword
 .eword:			defword ";", intrinsic_end_def, .dots
 .dots:			defword ".s", intrinsic_print_stack, 0
-
-
